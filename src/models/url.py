@@ -1,11 +1,10 @@
 from datetime import date
 
 from sqlalchemy import Date, String
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column
 
+from src.database import Base
 
-class Base(DeclarativeBase):
-    pass
 
 class Url(Base):
     __tablename__ = "url"
