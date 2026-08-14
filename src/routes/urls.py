@@ -1,5 +1,6 @@
-from datetime import date
+from datetime import datetime, timedelta
 
+import pytz
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -19,13 +20,16 @@ async def shorten_url(url_shorten: str, db: Session = Depends(get_db)):
     
     short_code = create_short_code()
 
-    count = db.query(Url).count()
-
+    # if short code was already taken then retry making until an unused one is created
     while db.query(Url).filter_by(short= short_code).first() is not None:
         short_code = create_short_code()
     
-    # check if short code is already in db
-    db_url = Url(full=strip_url(url_shorten), short=short_code, creation_date=date.today(), expiration_date=date.today())
+    db_url = Url(
+        full=strip_url(url_shorten), 
+        short=short_code, 
+        creation_date= datetime.now(tz=pytz.utc).date(), 
+        expiration_date=datetime.now(tz=pytz.utc).date() + timedelta(days=30)
+    )
 
     db.add(db_url)
     db.commit()
