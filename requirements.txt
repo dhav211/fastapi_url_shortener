@@ -4,3 +4,4 @@ httpx
 httpx2
 sqlalchemy
 pytz
+requests

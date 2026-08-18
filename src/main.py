@@ -22,3 +22,4 @@ async def redirect_to_short_code(short_code: str, db: Session = Depends(get_db))
         return RedirectResponse(url=f"https://{url.full}", status_code=302)
     else:
         raise HTTPException(status_code=404, detail=f"Short code {short_code} doesn't exist")
+

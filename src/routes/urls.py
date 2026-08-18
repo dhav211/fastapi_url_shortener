@@ -7,15 +7,22 @@ from sqlalchemy.orm import Session
 from src.database import get_db
 from src.models.url import Url
 from src.shorten import create_short_code, strip_url
+from src.valid_url import is_valid
 
 router = APIRouter(prefix="/api/v1/urls")
 
-@router.post("/{url_shorten:path}")
+@router.post("/")
 async def shorten_url(url_shorten: str, db: Session = Depends(get_db)):
     if db.query(Url).filter_by(full= strip_url(url_shorten)).first():
         raise HTTPException(
                     status_code=409,
                     detail=f"Url '{url_shorten}' already exists"
+                )
+
+    if not await is_valid(url=url_shorten):
+        raise HTTPException(
+                    status_code=400,
+                    detail=f"Url '{url_shorten}' cannot be reached"
                 )
     
     short_code = create_short_code()
