@@ -1,3 +1,4 @@
+import asyncio
 from datetime import date
 
 import pytest
@@ -7,8 +8,16 @@ from sqlalchemy.orm import Session
 from src.models.url import Url
 
 
+async def fake_is_safe(url: str):
+    return True
+
+async def fake_is_valid(url: str):
+    return True
+
 def test_shorten(client: TestClient, monkeypatch: pytest.MonkeyPatch, db_session: Session):
     url_to_shorten = "https://docs.sqlalchemy.org/en/20/orm/quickstart.html"
+    monkeypatch.setattr("src.routes.urls.is_safe", fake_is_safe)
+    monkeypatch.setattr("src.routes.urls.is_valid", fake_is_valid)
     monkeypatch.setattr("src.routes.urls.create_short_code", lambda: "abcd1234")
     expected_url = Url(full=url_to_shorten, short="abcd1234", creation_date=date.today(), expiration_date=date.today())
     response = client.post("/api/v1/urls/", params= {"url_shorten": url_to_shorten})
@@ -19,8 +28,10 @@ def test_shorten(client: TestClient, monkeypatch: pytest.MonkeyPatch, db_session
     assert response.json()["short"] == expected_url.short
     assert saved_url is not None
 
-def test_full_address_already_in_db(client: TestClient):
+def test_full_address_already_in_db(monkeypatch: pytest.MonkeyPatch, client: TestClient):
     used_address = "https://fastapi.tiangolo.com/tutorial/query-params/"
+    monkeypatch.setattr("src.routes.urls.is_safe", fake_is_safe)
+    monkeypatch.setattr("src.routes.urls.is_valid", fake_is_valid)
     response = client.post("/api/v1/urls/", params= {"url_shorten": used_address})
 
     assert response.status_code == 409
@@ -37,6 +48,8 @@ def test_short_code_already_in_db(client: TestClient, db_session: Session, monke
             return "a2df55sa"   # collides with existing row -> triggers retry
         return "b33f0ad8"      # unique -> loop exits
 
+    monkeypatch.setattr("src.routes.urls.is_safe", fake_is_safe)
+    monkeypatch.setattr("src.routes.urls.is_valid", fake_is_valid)
     monkeypatch.setattr("src.routes.urls.create_short_code", fake_create_short_code)    
     response = client.post("/api/v1/urls/", params= {"url_shorten": url_to_shorten})
 
@@ -48,8 +61,15 @@ def test_short_code_already_in_db(client: TestClient, db_session: Session, monke
 
 def test_invalid_url(monkeypatch: pytest.MonkeyPatch, client: TestClient):
     bad_url = "http://asdfgasfgasdfaserjkljvu.com"
-    monkeypatch.setattr("src.routes.urls.create_short_code", lambda: "abcd1234")
+    monkeypatch.setattr("src.routes.urls.is_safe", fake_is_safe)
     response = client.post("/api/v1/urls/", params= {"url_shorten": bad_url})
-
     
+    assert response.status_code == 400
+
+def test_malicious_url(monkeypatch: pytest.MonkeyPatch, client: TestClient):
+    mal_url = "http://testsafebrowsing.appspot.com/apiv4/ANY_PLATFORM/MALWARE/URL/"
+    
+    monkeypatch.setattr("src.routes.urls.is_safe", fake_is_safe)
+    response = client.post("/api/v1/urls/", params= {"url_shorten": mal_url})
+
     assert response.status_code == 400

@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime, timedelta
 
 import pytz
@@ -6,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from src.database import get_db
 from src.models.url import Url
+from src.safe_url import is_safe
 from src.shorten import create_short_code, strip_url
 from src.valid_url import is_valid
 
@@ -19,11 +21,19 @@ async def shorten_url(url_shorten: str, db: Session = Depends(get_db)):
                     detail=f"Url '{url_shorten}' already exists"
                 )
 
-    if not await is_valid(url=url_shorten):
+    valid, safe = await asyncio.gather(is_valid(url=url_shorten), is_safe(url=url_shorten))
+
+    if not valid:
         raise HTTPException(
                     status_code=400,
                     detail=f"Url '{url_shorten}' cannot be reached"
                 )
+
+    if not safe:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Url {url_shorten} is a malicious address"
+        )
     
     short_code = create_short_code()
 
